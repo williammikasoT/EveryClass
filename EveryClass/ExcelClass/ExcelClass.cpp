@@ -1,4 +1,4 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "ExcelClass.h"
 
 
@@ -9,50 +9,47 @@ ExcelClass::ExcelClass()
 
 ExcelClass::~ExcelClass()
 {
+	/*CloseExcel();*/
 }
 
 
-BOOL ExcelClass::InitExcel()
+BOOL ExcelClass::InitExcel(CString strFilePath)
 {
 	if (!AfxOleInit())
-	{
-		//MessageBox(L"³õÊ¼³öÏÖÎÊÌâ");
 		return FALSE;
+
+	COleVariant covOptional((long)DISP_E_PARAMNOTFOUND, VT_ERROR);
+
+	if (!m_app.CreateDispatch(_T("Excel.Application"), NULL))
+	{
+		AfxMessageBox(_T("æ— æ³•å¯åŠ¨ExcelæœåŠ¡å™¨!"));
+		return false;
 	}
+
+	m_books.AttachDispatch(m_app.get_Workbooks());
+	m_lpDisp = m_books.Open(strFilePath, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional);
+
+
 	return TRUE;
 }
 
 BOOL ExcelClass::WriteExcel(std::vector<CString> vtrData, CString strFileName,BOOL bLogExcelTimeLastCol)
 {
-	std::vector<CString> vStrLetter,vStrData;
-	// ÔİÊ±×î¶àĞ´ABCDEĞĞ
-	vStrLetter.push_back(L"A");
-	vStrLetter.push_back(L"B");
-	vStrLetter.push_back(L"C");
-	vStrLetter.push_back(L"D");
-	vStrLetter.push_back(L"E");
-	vStrLetter.push_back(L"F");
 
-	COleVariant covOptional((long)DISP_E_PARAMNOTFOUND, VT_ERROR);
-	if (!app.CreateDispatch(_T("Excel.Application")))
-	{
-		//this->MessageBox(_T("ÎŞ·¨´´½¨ExcelÓ¦ÓÃ£¡"));
-		return FALSE;
-	}
+	//COleVariant covOptional((long)DISP_E_PARAMNOTFOUND, VT_ERROR);
+	//if (!m_app.CreateDispatch(_T("Excel.Application"))) return FALSE;
+	
+	//m_lpDisp = m_books.Open(strFileName, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional);
 
-	books = app.get_Workbooks();
-	TCHAR szPath[MAX_PATH];
-	::GetCurrentDirectory(MAX_PATH, szPath);
-	CString strPath(szPath);
-	strPath += strFileName; // "\\Ä£°æ.xlsx"
-	lpDisp = books.Open(strPath, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional, covOptional);
-	book.AttachDispatch(lpDisp);
-	sheets = book.get_Worksheets();
-	sheet = sheets.get_Item(COleVariant((short)1));
-	//»ñµÃµ¥Ôª¸ñµÄÄÚÈİ Ê¹Êı¾İÓĞ×·¼Ó¼ÇÂ¼
-	range = sheet.get_UsedRange();
-	range = range.get_Rows();
-	long UsedRows = range.get_Count();
+	m_book.AttachDispatch(m_lpDisp);
+	m_books = m_app.get_Workbooks();
+	
+	m_sheets = m_book.get_Worksheets();
+	m_sheet = m_sheets.get_Item(COleVariant((short)1));
+	//è·å¾—å•å…ƒæ ¼çš„å†…å®¹ ä½¿æ•°æ®æœ‰è¿½åŠ è®°å½•
+	m_range = m_sheet.get_UsedRange();
+	m_range = m_range.get_Rows();
+	long UsedRows = m_range.get_Count();
 	CString strNum;
 	strNum.Format(L"%d", UsedRows + 1);
 
@@ -62,40 +59,127 @@ BOOL ExcelClass::WriteExcel(std::vector<CString> vtrData, CString strFileName,BO
 		vtrData.push_back(GetCurTiem());
 	}
 
+
+	std::vector<CString> vStrLetter, vStrData;
+	// æš‚æ—¶æœ€å¤šå†™ABCDEè¡Œ
+	vStrLetter.push_back(L"A");
+	vStrLetter.push_back(L"B");
+	vStrLetter.push_back(L"C");
+	vStrLetter.push_back(L"D");
+	vStrLetter.push_back(L"E");
+	vStrLetter.push_back(L"F");
+
 	//A3 A3,B3 B3 C3 C3,D3 D3
 	CString strI;
 	for (int i = 0; i < vtrData.size(); i++)
 	{
 		strI = vStrLetter[i] + strNum;
-		range = sheet.get_Range(COleVariant(strI), COleVariant(strI));
+		m_range = m_sheet.get_Range(COleVariant(strI), COleVariant(strI));
 		CString sss = vtrData[i];
-		range.put_Value2(COleVariant(sss));  // ÊäÈëÊı¾İ
+		m_range.put_Value2(COleVariant(sss));  // è¾“å…¥æ•°æ®
 	}
 
-	// excel±£´æÎÄ¼şµ½µ±Ç°Ä¿Â¼ÏÂ¸²¸Ç,²»ÌáÊ¾±£´æ
-	book.Save();
-	range.ReleaseDispatch();
-	sheet.ReleaseDispatch();
-	sheets.ReleaseDispatch();
-	book.ReleaseDispatch();
-	books.ReleaseDispatch();
-	app.Quit();
-	app.ReleaseDispatch();
+	// excelä¿å­˜æ–‡ä»¶åˆ°å½“å‰ç›®å½•ä¸‹è¦†ç›–,ä¸æç¤ºä¿å­˜
+
+	CloseExcel();
 
 	return TRUE;
 
 }
 
+
+bool ExcelClass::ReadExcel(std::map<CString, CString>& mString)
+{
+
+	//å¾—åˆ°Workbook Â  Â 
+	m_book.AttachDispatch(m_lpDisp);
+	//å¾—åˆ°Worksheets Â Â 
+	m_sheets.AttachDispatch(m_book.get_Worksheets());
+
+	//å¾—åˆ°å½“å‰æ´»è·ƒsheet 
+	m_lpDisp = m_book.get_ActiveSheet();
+	m_sheet.AttachDispatch(m_lpDisp);
+
+	//è·å–è¡Œï¼Œåˆ—
+	m_range = m_sheet.get_UsedRange();
+
+	m_range = m_range.get_Rows();
+	long UsedRows = m_range.get_Count();
+	m_range  = m_range.get_Columns();
+	long UsedCols = m_range.get_Count();
+
+	//std::map<CString, CString> mString;
+
+	CStringArray strName;
+	CStringArray strArr;
+	for (int r = 2;r <= UsedRows; r++)
+	{ 
+		for (int c = 2; c <= 3; c++)
+		{
+			m_range.AttachDispatch(m_sheet.get_Cells());
+			m_range.AttachDispatch(m_range.get_Item(COleVariant((long)r), COleVariant((long)c)).pdispVal);   //ç¬¬ä¸€å˜é‡æ˜¯è¡Œï¼Œç¬¬äºŒä¸ªå˜é‡æ˜¯åˆ—ï¼Œå³ç¬¬äºŒè¡Œç¬¬ä¸€åˆ—
+
+
+			COleVariant vResult = m_range.get_Value2();
+			if (vResult.vt == VT_BSTR) //å­—ç¬¦ä¸² Â 
+			{
+				if(c == 2)
+				strName.Add(vResult.bstrVal);
+				else if(c == 3)
+				strArr.Add(vResult.bstrVal);
+			}
+			else if (vResult.vt == VT_R8) //8å­—èŠ‚çš„æ•°å­— Â 
+			{
+				CString str;
+				str.Format(_T("%.0f"), vResult.dblVal);
+				if (c == 2)
+					strName.Add(str);
+				else if(c == 3)
+					strArr.Add(str);
+			}
+
+		}
+	}
+
+	for (int i = 0; i < strName.GetCount(); i++)
+	{
+		if (strName[i].IsEmpty() || strArr.IsEmpty())
+			continue;
+		mString.insert(std::pair<CString, CString>(strArr[i], strName[i]));
+	}
+		
+
+		//mString[strName[i]] = strArr[i];
+
+	CloseExcel();
+
+	return true;
+}
+
+void ExcelClass::CloseExcel()
+{
+	m_book.Save();
+	m_range.ReleaseDispatch();
+	m_sheet.ReleaseDispatch();
+	m_sheets.ReleaseDispatch();
+	m_book.ReleaseDispatch();
+	m_books.ReleaseDispatch();
+	m_app.Quit();
+	m_app.ReleaseDispatch();
+}
+
+
+
 CString ExcelClass::GetCurTiem()
 {
 	CString strTime, str;
-	CTime time = CTime::GetCurrentTime();   ///¹¹ÔìCTime¶ÔÏó
-	int m_nYear = time.GetYear();      ///Äê
-	int m_nMonth = time.GetMonth();      ///ÔÂ
-	int m_nDay = time.GetDay();      ///ÈÕ
-	int m_nHour = time.GetHour();      ///Ğ¡Ê±
-	int m_nMinute = time.GetMinute();   ///·ÖÖÓ
-	int m_nSecond = time.GetSecond();   ///Ãë
+	CTime time = CTime::GetCurrentTime();   ///æ„é€ CTimeå¯¹è±¡
+	int m_nYear = time.GetYear();      ///å¹´
+	int m_nMonth = time.GetMonth();      ///æœˆ
+	int m_nDay = time.GetDay();      ///æ—¥
+	int m_nHour = time.GetHour();      ///å°æ—¶
+	int m_nMinute = time.GetMinute();   ///åˆ†é’Ÿ
+	int m_nSecond = time.GetSecond();   ///ç§’
 	strTime.Format(L"%d/", m_nYear);
 	str = strTime;
 	strTime.Format(L"%02d/", m_nMonth);
